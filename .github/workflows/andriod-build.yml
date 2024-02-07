@@ -1,4 +1,4 @@
-name: Android Build & Release
+name: Build and Release Android
 
 on:
   push:
@@ -6,60 +6,55 @@ on:
       - master
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up JDK
-      uses: actions/setup-java@v2
-      with:
-        distribution: 'adopt'
-        java-version: '17'
+      # Gradle Cache
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
-    - name: Build APK
-      run: ./gradlew assembleRelease
+      # Yarn Cache
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "::set-output name=dir::$(yarn cache dir)"
+      - uses: actions/cache@v2
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
 
-  release:
-    runs-on: ubuntu-latest
+      - name: Set up JDK 17
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'adopt'
+          java-version: '17'
 
-    needs: build
+      - name: Install node dependencies
+        run: yarn install --frozen-lockfile
 
-    steps:
-    - name: Upload Release Artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: app-release
-        path: andriod/build/outputs/apk/release/*.apk
+      - name: Bundle *.apk & *.aab
+        run: cd android && ./gradlew bundleRelease
 
-  deploy:
-    runs-on: ubuntu-latest
+      - name: Upload Artifact APK
+        uses: actions/upload-artifact@v2
+        with:
+          name: Apk
+          path: android/app/build/outputs/bundle/release/app-release.apk
 
-    needs: release
-
-    steps:
-    - name: Download Release Artifact
-      uses: actions/download-artifact@v2
-      with:
-        name: app-release
-        path: app-release
-
-    - name: Create GitHub Release
-      id: create_release
-      uses: actions/create-release@v1
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
-
-    - name: Upload Release Artifact
-      id: upload-release-asset
-      uses: actions/upload-release-asset@v1
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./app-release/*.apk
-        asset_name: app-release.apk
-        asset_content_type: application/vnd.android.package-archive
+      - name: Upload Artifact AAB
+        uses: actions/upload-artifact@v2
+        with:
+          name: Aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
