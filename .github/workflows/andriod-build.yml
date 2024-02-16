@@ -60,7 +60,7 @@ jobs:
           path: android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Create Release on GitHub
-        uses: actions/create-release@v2
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Replace with your actual token
         with:
